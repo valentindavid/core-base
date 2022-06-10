@@ -1,0 +1,84 @@
+name: core22
+# version: "22"
+adopt-info: bootstrap
+summary: Runtime environment based on Ubuntu 22.04
+description: |
+  The base snap based on the Ubuntu 22.04 release.
+confinement: strict
+type: base
+build-base: core22
+grade: stable
+assumes: [snapd2.55.5]
+
+.build-package: &build-package
+  plugin: nil
+  build-packages:
+    - devscripts
+  override-pull: |
+    snapcraftctl pull
+    # install build dependencies
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    sudo -E apt-get build-dep -y ./
+  override-build: |
+    # unset the LD_FLAGS and LD_LIBRARY_PATH vars that snapcraft sets for us
+    # as those will point to the $SNAPCRAFT_STAGE which on re-builds will
+    # contain things like libc and friends that confuse the debian package
+    # build system
+    # TODO: should we unset $PATH to not include $SNAPCRAFT_STAGE too?
+    unset LD_FLAGS
+    unset LD_LIBRARY_PATH
+    # run the real build (but just build the binary package, and don't
+    # bother compressing it too much)
+    dpkg-buildpackage -b -uc -us -Zgzip -zfast
+    mkdir -p "${SNAPCRAFT_PART_INSTALL}/local-debs"
+    source="$(dpkg-parsechangelog -SSource)"
+    version="$(dpkg-parsechangelog -SVersion)"
+    arch="$(dpkg --print-architecture)"
+    dcmd mv "../${source}_${version}_${arch}.changes" "${SNAPCRAFT_PART_INSTALL}/local-debs"
+  override-stage: |
+    snapcraftctl stage
+    cd "${SNAPCRAFT_STAGE}/local-debs"
+    dpkg-scanpackages . >Packages
+    apt-ftparchive release . >Release
+  prime:
+    - -local-debs
+
+parts:
+  probert-deb:
+    <<: *build-package
+    source: https://github.com/canonical/probert.git
+    source-type: git
+    # following branch server/jammy
+    source-commit: 639255e5ddceb00cb21c2436e7ce1f7430aa710f
+
+  consoleconf-deb:
+    <<: *build-package
+    source: https://github.com/canonical/subiquity.git
+    source-type: git
+    # following branch server/jammy
+    source-commit: 8f9f97c69bb36048ea4c9e16be34bca3ac141771
+
+  bootstrap:
+    after:
+      - consoleconf-deb
+      - probert-deb
+    plugin: make
+    source: .
+    build-packages:
+      - shellcheck
+      - wget
+      - distro-info
+    build-snaps:
+      # XXX: Temporarily force using snapd from edge for building the snap,
+      # as there seems to be an issue with the current snapd on impish, causing
+      # core-dumps of the mksquashfs call (via `snap pack`).
+      - snapd/latest/edge
+    override-pull: |
+      snapcraftctl set-version "$(/bin/date +%Y%m%d)"
+      snapcraftctl pull
+      make pull
+    override-prime: |
+      snapcraftctl prime
+      # ensure build-in tests are run
+      cd ${SNAPCRAFT_PART_SRC} && make test TESTDIR=${SNAPCRAFT_PRIME}
