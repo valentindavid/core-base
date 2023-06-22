@@ -74,10 +74,12 @@ Pin: origin ""
 Pin-Priority: 1001
 EOF
 
-# enable security ICE ppa
-echo "deb http://ppa.launchpadcontent.net/ubuntu-security/fde-ice/ubuntu $CODENAME main" > /etc/apt/sources.list.d/fde-ice.list
+# TODO: There is no PPA for mantic yet.
+if false; then
+  # enable security ICE ppa
+  echo "deb http://ppa.launchpadcontent.net/ubuntu-security/fde-ice/ubuntu $CODENAME main" > /etc/apt/sources.list.d/fde-ice.list
 
-cat >/etc/apt/trusted.gpg.d/canonical-security-fde-ice.asc <<'EOF'
+  cat >/etc/apt/trusted.gpg.d/canonical-security-fde-ice.asc <<'EOF'
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 xo0ESXbhhAEEAMgPw5cjuQparAFSRh4v/yrXGefOE4KzlV+OudbHPn/nxfhgXn1d
@@ -92,7 +94,7 @@ ebrtrD1Hrw3BetRY4aQ0ysRSugvbTwqS0d17zepomYJS49Jy2w2D
 -----END PGP PUBLIC KEY BLOCK-----
 
 EOF
-
+fi
 
 # install some packages we need
 apt update
